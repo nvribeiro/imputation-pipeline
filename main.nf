@@ -33,12 +33,12 @@ workflow {
     /*
      * Step 6: checkVCF (parallel per chr)
      */
-    CHECK_VCF(hrc_vcfs)
+    CHECK_VCF(hrc_vcfs.flatten())
 
     /*
      * Step 7: bgzip (parallel per chr)
      */
-    BGZIP_VCF(hrc_vcfs)
+    BGZIP_VCF(hrc_vcfs.flatten())
 }
 
 process CREATE_LGEN {
