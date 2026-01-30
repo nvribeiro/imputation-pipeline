@@ -10,8 +10,8 @@ workflow {
      * Step 1: finalreport → lgen/map/fam
      */
     lgen_files = CREATE_LGEN(
-        params.input.final_report,
-        params.input.sample_info
+        file(params.input.final_report),
+        file(params.input.sample_info)
     )
 
     /*
@@ -32,27 +32,31 @@ workflow {
     /*
      * Step 5: HRC formatting
      */
-    hrc_dir = MAKE_HRC_VCF(freq_prefix)
+    hrc_vcf = MAKE_HRC_VCF(freq_prefix)
 
     /*
      * Step 6: checkVCF (parallel per chr)
      */
-    checked = CHECK_VCF(chr_ch, hrc_dir)
+    checked = CHECK_VCF(chr_ch, hrc_vcf.vcf)
 
     /*
      * Step 7: bgzip (parallel per chr)
      */
-    BGZIP_VCF(chr_ch, hrc_dir)
+    BGZIP_VCF(chr_ch, hrc_vcf.vcf)
 }
 
 process CREATE_LGEN {
+
+    publishDir "${params.output_dir}", mode: 'copy'
 
     input:
     path final_report
     path sample_info
 
     output:
-    path "${params.output_dir}/${params.dataset}.*"
+    path "${params.dataset}.lgen"
+    path "${params.dataset}.map"
+    path "${params.dataset}.fam"
 
     script:
     """
@@ -73,63 +77,69 @@ process LGEN_TO_PLINK {
     path lgen_files
 
     output:
-    path "${params.output_dir}/${params.dataset}.*"
+    path "${params.dataset}.*"
 
     script:
     """
     module load PLINK/1.9-beta6-20190617
 
-    plink --lfile ${params.output_dir}/${params.dataset} \
+    plink --lfile ${params.dataset} \
           --autosome \
           --make-bed \
-          --out ${params.output_dir}/${params.dataset}
+          --out ${params.dataset}
     """
 }
 
 process UPDATE_BUILD {
 
+    publishDir "${params.output_dir}/GSA_updated", mode: 'copy'
+
     input:
     path bed_prefix
 
     output:
-    path "${params.output_dir}/GSA_updated/${params.dataset}_GSA_updated.*"
+    path "${params.dataset}_GSA_updated.*"
 
     script:
     """
     module load PLINK/1.9-beta6-20190617
 
     scripts/update_build.sh \
-        ${params.output_dir}/${params.dataset} \
+        ${bed_prefix.baseName} \
         /groups/umcg-immunogenetics/tmp02/users/NathanRibeiro/tools/GSA_strand_v3/GSAMD-24v3-0-EA_20034606_A1-b37.strand \
-        ${params.output_dir}/GSA_updated/${params.dataset}_GSA_updated
+        ${params.dataset}_GSA_updated
     """
 }
 
 process PLINK_FREQ {
 
+    publishDir "${params.output_dir}/GSA_updated", mode: 'copy'
+
     input:
     path updated_prefix
 
     output:
-    path "${params.output_dir}/GSA_updated/${params.dataset}_GSA_updated.*"
+    path "${params.dataset}_GSA_updated.frq*"
 
     script:
     """
     module load PLINK/1.9-beta6-20190617
 
     plink --freq \
-          --bfile ${params.output_dir}/GSA_updated/${params.dataset}_GSA_updated \
-          --out  ${params.output_dir}/GSA_updated/${params.dataset}_GSA_updated
+          --bfile ${updated_prefix.baseName} \
+          --out ${params.dataset}_GSA_updated
     """
 }
 
 process MAKE_HRC_VCF {
 
+    publishDir "${params.output_dir}/HRC_formatted", mode: 'copy', pattern: "*-updated-chr*.vcf"
+
     input:
     path freq_prefix
 
     output:
-    path "${params.output_dir}/HRC_formatted/*"
+    path "${params.dataset}_GSA_updated-updated-chr*.vcf", emit: vcf
 
     script:
     """
@@ -137,12 +147,9 @@ process MAKE_HRC_VCF {
     module load PerlPlus/5.34.1-GCCcore-11.3.0-v22.11.1
     module load PLINK/1.9-beta6-20190617
 
-    mkdir -p ${params.output_dir}/HRC_formatted
-    cd ${params.output_dir}/HRC_formatted
-
     perl ${params.HRC_script} \
-        -b ${params.output_dir}/GSA_updated/${params.dataset}_GSA_updated.bim \
-        -f ${params.output_dir}/GSA_updated/${params.dataset}_GSA_updated.frq \
+        -b ${freq_prefix.parent}/${params.dataset}_GSA_updated.bim \
+        -f ${freq_prefix.parent}/${params.dataset}_GSA_updated.frq \
         -r ${params.HRC_reference} \
         -h
 
@@ -152,12 +159,14 @@ process MAKE_HRC_VCF {
 
 process CHECK_VCF {
 
+    publishDir "${params.output_dir}/checkVCF", mode: 'copy'
+
     input:
     val chr
-    path hrc_dir
+    path hrc_vcf
 
     output:
-    path "${params.output_dir}/checkVCF/check-chr${chr}"
+    path "check-chr${chr}*"
 
     script:
     """
@@ -165,27 +174,29 @@ process CHECK_VCF {
 
     ${params.python2_path}/python2.7 scripts/checkVCF.py \
         -r ${params.checkvcf_ref} \
-        -o ${params.output_dir}/checkVCF/check-chr${chr} \
-        ${hrc_dir}/${params.dataset}_GSA_updated-updated-chr${chr}.vcf
+        -o check-chr${chr} \
+        ${hrc_vcf}
     """
 }
 
 process BGZIP_VCF {
 
+    publishDir "${params.output_dir}/VCF_compressed", mode: 'copy'
+
     input:
     val chr
-    path hrc_dir
+    path hrc_vcf
 
     output:
-    path "${params.output_dir}/VCF_compressed/${params.dataset}_final-chr${chr}.vcf.gz"
+    path "${params.dataset}_final-chr${chr}.vcf.gz"
 
     script:
     """
     module load BCFtools/1.22-GCCcore-13.3.0
 
     bcftools view \
-        ${hrc_dir}/${params.dataset}_GSA_updated-updated-chr${chr}.vcf \
+        ${hrc_vcf} \
         -Oz \
-        -o ${params.output_dir}/VCF_compressed/${params.dataset}_final-chr${chr}.vcf.gz
+        -o ${params.dataset}_final-chr${chr}.vcf.gz
     """
 }
