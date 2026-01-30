@@ -32,23 +32,17 @@ workflow {
     /*
      * Step 5: HRC formatting
      */
-    hrc_vcfs = MAKE_HRC_VCF(freq_out)
-
-    hrc_by_chr = hrc_vcf_ch
-        .map { vcf ->
-            def chr = (vcf.name =~ /chr(\d+)/)[0][1] as int
-            tuple(chr, vcf)
-        }
+     hrc_vcfs = MAKE_HRC_VCF(freq_ch)
 
     /*
      * Step 6: checkVCF (parallel per chr)
      */
-    CHECK_VCF(hrc_by_chr)
+    CHECK_VCF(hrc_vcfs)
 
     /*
      * Step 7: bgzip (parallel per chr)
      */
-    BGZIP_VCF(hrc_by_chr)
+    BGZIP_VCF(hrc_vcfs)
 }
 
 process CREATE_LGEN {
@@ -175,9 +169,7 @@ process MAKE_HRC_VCF {
           path(log)
 
     output:
-    tuple val(prefix),
-          path("${prefix}-updated.bed"),
-          path("${prefix}-updated-chr*.vcf")
+    path "${prefix}-updated-chr*.vcf"
 
     script:
     """
@@ -200,21 +192,21 @@ process CHECK_VCF {
     publishDir "${params.output_dir}/checkVCF", mode: 'copy'
 
     input:
-    tuple val(prefix),
-          val(chr),
-          path(vcf)
+    path hrc_vcf
 
     output:
-    path "check-chr${chr}*"
+    path "check-*"
 
     script:
     """
     export LD_LIBRARY_PATH=${params.openssl_path}:\$LD_LIBRARY_PATH
 
+    chr=\$(echo ${hrc_vcf} | sed -n 's/.*chr\\([0-9]\\+\\).*/\\1/p')
+
     ${params.python2_path}/python2.7 ${projectDir}/scripts/checkVCF.py \
         -r ${params.checkvcf_ref} \
-        -o check-chr${chr} \
-        ${vcf}
+        -o check-chr\${chr} \
+        ${hrc_vcf}
     """
 }
 
@@ -223,20 +215,20 @@ process BGZIP_VCF {
     publishDir "${params.output_dir}/VCF_compressed", mode: 'copy'
 
     input:
-    tuple val(prefix),
-          val(chr),
-          path(vcf)
+    path hrc_vcf
 
     output:
-    path "${prefix}_final-chr${chr}.vcf.gz"
+    path "${params.dataset}_final-*.vcf.gz"
 
     script:
     """
     module load BCFtools/1.22-GCCcore-13.3.0
 
+    chr=\$(echo ${hrc_vcf} | sed -n 's/.*chr\\([0-9]\\+\\).*/\\1/p')
+
     bcftools view \
-        ${vcf} \
+        ${hrc_vcf} \
         -Oz \
-        -o ${prefix}_final-chr${chr}.vcf.gz
+        -o ${params.dataset}_final-chr\${chr}.vcf.gz
     """
 }
