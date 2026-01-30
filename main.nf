@@ -1,6 +1,8 @@
 nextflow.enable.dsl=2
 
 workflow {
+    // Create logs directory if it doesn't exist
+    new File("${params.output_dir}/logs").mkdirs()
 
     /*
      * Step 1: finalreport → lgen/map/fam
@@ -195,7 +197,7 @@ process CHECK_VCF {
 
     script:
     """
-    export LD_LIBRARY_PATH=${params.openssl_path}:\$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=${params.openssl_path}:\${LD_LIBRARY_PATH:-}
 
     chr=\$(echo ${hrc_vcf} | sed -n 's/.*chr\\([0-9]\\+\\).*/\\1/p')
 

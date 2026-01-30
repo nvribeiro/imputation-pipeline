@@ -7,6 +7,12 @@ Created by: Nathan V Ribeiro <n.v.ribeiro@umcg.nl> - UMCG Immunogenetics Group
 
 ## How to use
 ### 1. Get the codes
+Copy the codes to your folder where you want to run the pipeline.
+```
+# Go to your directory, for example
+cd /groups/umcg-immunogenetics/tmp02/users/YourName/
+git clone https://github.com/nvribeiro/imputation-pipeline.git
+```
 
 ### 2. Create the sampleinfo file
 To create this file, you need to know the samples that are included in your FinalReport.txt. A quick way of doing that is by typing the following line of code in the terminal: <br>
@@ -27,9 +33,14 @@ CeDNN_1244,1,2
 CeDNN_1254,2,2
 ```
 
-Save this file as `sample_info.csv` in the folder where your pipeline is.
+Save this file as `sample_info.csv` in the folder `imputation-pipeline`
 
 ### 3. Update the file nextflow.config
+Edit the file `nextflow.config` and change the parameters `dataset` to the name of your dataset and `final_report` to the path where your FinalReport.txt is located.
 
 ### 4. Run
-module load nextflow
+To start the pipeline simply submit the job `submit.sh` as a sbatch job, located in the `imputation-pipeline` folder.
+```
+cd imputation-pipeline
+sbatch submit.sh
+```
