@@ -224,11 +224,9 @@ process BGZIP_VCF {
     """
     module load BCFtools/1.22-GCCcore-13.3.0
 
-    chr=\$(echo ${hrc_vcf} | sed -n 's/.*chr\\([0-9]\\+\\).*/\\1/p')
-
     bcftools view \
         ${hrc_vcf} \
         -Oz \
-        -o ${params.dataset}_final-chr\${chr}.vcf.gz
+        -o ${params.dataset}_final-${hrc_vcf.simpleName}.vcf.gz
     """
 }
