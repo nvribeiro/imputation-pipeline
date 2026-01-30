@@ -121,10 +121,10 @@ process UPDATE_BUILD {
           path(fam)
 
     output:
-    tuple val(updated_prefix),
-          path("${updated_prefix}.bed"),
-          path("${updated_prefix}.bim"),
-          path("${updated_prefix}.fam")
+    tuple val(prefix + '_GSA_updated'),
+          path("${prefix}_GSA_updated.bed"),
+          path("${prefix}_GSA_updated.bim"),
+          path("${prefix}_GSA_updated.fam")
 
     script:
     """
@@ -133,7 +133,7 @@ process UPDATE_BUILD {
     ${projectDir}/scripts/update_build.sh \
         ${prefix} \
         /groups/umcg-immunogenetics/tmp02/users/NathanRibeiro/tools/GSA_strand_v3/GSAMD-24v3-0-EA_20034606_A1-b37.strand \
-        ${updated_prefix}
+        ${prefix}_GSA_updated
     """
 }
 
@@ -142,25 +142,25 @@ process PLINK_FREQ {
     publishDir "${params.output_dir}/GSA_updated", mode: 'copy'
 
     input:
-    tuple val(updated_prefix),
+    tuple val(prefix),
           path(bed),
           path(bim),
           path(fam)
 
     output:
-    tuple val(updated_prefix),
+    tuple val(prefix),
           path(bim),
-          path("${updated_prefix}.frq"),
-          path("${updated_prefix}.log")
+          path("${prefix}.frq"),
+          path("${prefix}.log")
 
     script:
     """
     module load PLINK/1.9-beta6-20190617
 
     plink \
-      --bfile ${updated_prefix} \
+      --bfile ${prefix} \
       --freq \
-      --out ${updated_prefix}
+      --out ${prefix}
     """
 }
 
@@ -169,14 +169,14 @@ process MAKE_HRC_VCF {
     publishDir "${params.output_dir}/HRC_formatted", mode: 'copy'
 
     input:
-    tuple val(updated_prefix),
+    tuple val(prefix),
           path(bim),
           path(frq),
           path(log)
 
     output:
-    tuple val(updated_prefix),
-          path("${updated_prefix}-updated-chr*.vcf")
+    tuple val(prefix),
+          path("${prefix}-updated-chr*.vcf")
 
     script:
     """
@@ -199,7 +199,7 @@ process CHECK_VCF {
     publishDir "${params.output_dir}/checkVCF", mode: 'copy'
 
     input:
-    tuple val(updated_prefix),
+    tuple val(prefix),
           val(chr),
           path(vcf)
 
@@ -222,12 +222,12 @@ process BGZIP_VCF {
     publishDir "${params.output_dir}/VCF_compressed", mode: 'copy'
 
     input:
-    tuple val(updated_prefix),
+    tuple val(prefix),
           val(chr),
           path(vcf)
 
     output:
-    path "${updated_prefix}_final-chr${chr}.vcf.gz"
+    path "${prefix}_final-chr${chr}.vcf.gz"
 
     script:
     """
@@ -236,6 +236,6 @@ process BGZIP_VCF {
     bcftools view \
         ${vcf} \
         -Oz \
-        -o ${updated_prefix}_final-chr${chr}.vcf.gz
+        -o ${prefix}_final-chr${chr}.vcf.gz
     """
 }
