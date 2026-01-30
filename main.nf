@@ -1,8 +1,6 @@
 nextflow.enable.dsl=2
 
-Channel
-    .of(params.chromosomes)
-    .set { chr_ch }
+chr_ch = Channel.from(1..22)
 
 workflow {
 
@@ -34,15 +32,26 @@ workflow {
      */
     hrc_ch = MAKE_HRC_VCF(freq_ch)
 
+    /* # Create (prefix, chr, vcf) */
+    hrc_by_chr = hrc_ch.map { prefix, vcf ->
+        def m = (vcf.name =~ /chr(\d+)/)
+        assert m
+        tuple(prefix, m[0][1] as int, vcf)
+    }
+
+    /* # Restrict explicitly to chromosomes 1–22 */
+    hrc_by_chr = hrc_by_chr.filter { prefix, chr, vcf ->
+        chr in 1..22
+
     /*
      * Step 6: checkVCF (parallel per chr)
      */
-    CHECK_VCF(chr_ch, hrc_ch)
+    CHECK_VCF(hrc_by_chr)
 
     /*
      * Step 7: bgzip (parallel per chr)
      */
-    BGZIP_VCF(chr_ch, hrc_ch)
+    BGZIP_VCF(hrc_by_chr)
 }
 
 process CREATE_LGEN {
@@ -93,17 +102,15 @@ process LGEN_TO_PLINK {
     """
     module load PLINK/1.9-beta6-20190617
 
-    plink --lfile ${prefix}
+    plink --lfile ${prefix} \
           --make-bed \
-          --out ${prefix}
+          --out ${prefix} \
           --memory 16000
     """
 }
 
+
 process UPDATE_BUILD {
-
-    process UPDATE_BUILD {
-
     publishDir "${params.output_dir}/GSA_updated", mode: 'copy'
 
     input:
@@ -128,37 +135,47 @@ process UPDATE_BUILD {
         ${prefix}_GSA_updated
     """
 }
-}
 
 process PLINK_FREQ {
 
     publishDir "${params.output_dir}/GSA_updated", mode: 'copy'
 
     input:
-    path updated_prefix
+    tuple val(prefix),
+          path(bed),
+          path(bim),
+          path(fam)
 
     output:
-    path "${params.dataset}_GSA_updated.frq*"
+    tuple val(prefix),
+          path(bim),
+          path("${prefix}.frq"),
+          path("${prefix}.log")
 
     script:
     """
     module load PLINK/1.9-beta6-20190617
 
-    plink --freq \
-          --bfile ${updated_prefix.baseName} \
-          --out ${params.dataset}_GSA_updated
+    plink \
+      --bfile ${prefix} \
+      --freq \
+      --out ${prefix}
     """
 }
 
 process MAKE_HRC_VCF {
 
-    publishDir "${params.output_dir}/HRC_formatted", mode: 'copy', pattern: "*-updated-chr*.vcf"
+    publishDir "${params.output_dir}/HRC_formatted", mode: 'copy'
 
     input:
-    path freq_prefix
+    tuple val(prefix),
+          path(bim),
+          path(frq),
+          path(log)
 
     output:
-    path "${params.dataset}_GSA_updated-updated-chr*.vcf", emit: vcf
+    tuple val(prefix),
+          path("${prefix}-updated-chr*.vcf")
 
     script:
     """
@@ -167,8 +184,8 @@ process MAKE_HRC_VCF {
     module load PLINK/1.9-beta6-20190617
 
     perl ${projectDir}/scripts/HRC-1000G-check-bim-NoReadKey.pl \
-        -b ${freq_prefix.parent}/${params.dataset}_GSA_updated.bim \
-        -f ${freq_prefix.parent}/${params.dataset}_GSA_updated.frq \
+        -b ${bim} \
+        -f ${frq} \
         -r ${params.HRC_reference} \
         -h
 
@@ -181,8 +198,9 @@ process CHECK_VCF {
     publishDir "${params.output_dir}/checkVCF", mode: 'copy'
 
     input:
-    val chr
-    path hrc_vcf
+    tuple val(prefix),
+          val(chr),
+          path(vcf)
 
     output:
     path "check-chr${chr}*"
@@ -191,10 +209,10 @@ process CHECK_VCF {
     """
     export LD_LIBRARY_PATH=${params.openssl_path}:\$LD_LIBRARY_PATH
 
-    ${params.python2_path}/python2.7 scripts/checkVCF.py \
+    ${params.python2_path}/python2.7 ${projectDir}/scripts/checkVCF.py \
         -r ${params.checkvcf_ref} \
         -o check-chr${chr} \
-        ${hrc_vcf}
+        ${vcf}
     """
 }
 
@@ -203,19 +221,20 @@ process BGZIP_VCF {
     publishDir "${params.output_dir}/VCF_compressed", mode: 'copy'
 
     input:
-    val chr
-    path hrc_vcf
+    tuple val(prefix),
+          val(chr),
+          path(vcf)
 
     output:
-    path "${params.dataset}_final-chr${chr}.vcf.gz"
+    path "${prefix}_final-chr${chr}.vcf.gz"
 
     script:
     """
     module load BCFtools/1.22-GCCcore-13.3.0
 
     bcftools view \
-        ${hrc_vcf} \
+        ${vcf} \
         -Oz \
-        -o ${params.dataset}_final-chr${chr}.vcf.gz
+        -o ${prefix}_final-chr${chr}.vcf.gz
     """
 }
