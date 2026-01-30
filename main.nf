@@ -63,7 +63,7 @@ process CREATE_LGEN {
     """
     module load RPlus/4.2.1-foss-2022a-v22.12.1
 
-    Rscript scripts/create_lgen.R \
+    Rscript ${projectDir}/scripts/create_lgen.R \
         $final_report \
         $sample_info \
         ${params.dataset}.lgen \
@@ -111,7 +111,7 @@ process UPDATE_BUILD {
     """
     module load PLINK/1.9-beta6-20190617
 
-    scripts/update_build.sh \
+    ${projectDir}/scripts/update_build.sh \
         ${bed_prefix.baseName} \
         /groups/umcg-immunogenetics/tmp02/users/NathanRibeiro/tools/GSA_strand_v3/GSAMD-24v3-0-EA_20034606_A1-b37.strand \
         ${params.dataset}_GSA_updated
@@ -154,7 +154,7 @@ process MAKE_HRC_VCF {
     module load PerlPlus/5.34.1-GCCcore-11.3.0-v22.11.1
     module load PLINK/1.9-beta6-20190617
 
-    perl ${params.HRC_script} \
+    perl ${projectDir}/scripts/HRC-1000G-check-bim-NoReadKey.pl \
         -b ${freq_prefix.parent}/${params.dataset}_GSA_updated.bim \
         -f ${freq_prefix.parent}/${params.dataset}_GSA_updated.frq \
         -r ${params.HRC_reference} \
