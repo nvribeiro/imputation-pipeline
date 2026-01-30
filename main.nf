@@ -1,6 +1,8 @@
 nextflow.enable.dsl=2
 
-chr_ch = Channel.from(1..22)
+Channel
+    .from(1..22)
+    .set { chr_ch }
 
 workflow {
 
@@ -30,19 +32,13 @@ workflow {
     /*
      * Step 5: HRC formatting
      */
-    hrc_ch = MAKE_HRC_VCF(freq_ch)
+    hrc_vcfs = MAKE_HRC_VCF(freq_out)
 
-    /* # Create (prefix, chr, vcf) */
-    hrc_by_chr = hrc_ch.map { prefix, vcf ->
-        def m = (vcf.name =~ /chr(\d+)/)
-        assert m
-        tuple(prefix, m[0][1] as int, vcf)
-    }
-
-    /* # Restrict explicitly to chromosomes 1–22 */
-    hrc_by_chr = hrc_by_chr.filter { prefix, chr, vcf ->
-        chr in 1..22
-    }
+    hrc_by_chr = hrc_vcf_ch
+        .map { vcf ->
+            def chr = (vcf.name =~ /chr(\d+)/)[0][1] as int
+            tuple(chr, vcf)
+        }
 
     /*
      * Step 6: checkVCF (parallel per chr)
@@ -149,7 +145,9 @@ process PLINK_FREQ {
 
     output:
     tuple val(prefix),
+          path(bed),
           path(bim),
+          path(fam),
           path("${prefix}.frq"),
           path("${prefix}.log")
 
@@ -170,12 +168,15 @@ process MAKE_HRC_VCF {
 
     input:
     tuple val(prefix),
+          path(bed),
           path(bim),
+          path(fam),
           path(frq),
           path(log)
 
     output:
     tuple val(prefix),
+          path("${prefix}-updated.bed"),
           path("${prefix}-updated-chr*.vcf")
 
     script:
