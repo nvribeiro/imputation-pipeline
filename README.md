@@ -44,3 +44,4 @@ To start the pipeline simply submit the job `submit.sh` as a sbatch job, located
 cd prepare-genotypes
 sbatch submit.sh
 ```
+Once the pipeline is completed, your final VCF files ready to be submited to Michigan Imputation Server will be in the folder `results/your_dataset/VCF_compressed`. Make sure to first check the logs in the folder `check_VCF` to see if everything is fine with your VCFs.
