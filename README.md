@@ -45,3 +45,7 @@ cd prepare-genotypes
 sbatch submit.sh
 ```
 Once the pipeline is completed, your final VCF files ready to be submited to Michigan Imputation Server will be in the folder `results/your_dataset/VCF_compressed`. Make sure to first check the logs in the folder `check_VCF` to see if everything is fine with your VCFs.
+
+## Imputation
+If you wish to continue with genotype imputation, read the Michigan Imputation Server documentation for instructions: [https://genepi.github.io/michigan-imputationserver/]
+To check if your imputation was sucessful, you can use this post-imputation quality control tool: [https://www.chg.ox.ac.uk/~wrayner/tools/Post-Imputation.html]
